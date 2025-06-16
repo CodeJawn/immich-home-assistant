@@ -15,10 +15,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONF_WATCHED_ALBUMS
 from .hub import ImmichHub
 
-SCAN_INTERVAL = timedelta(seconds=45)
+SCAN_INTERVAL = timedelta(seconds=30)
 
 # How often to refresh the list of available asset IDs
-_ID_LIST_REFRESH_INTERVAL = timedelta(hours=12)
+_ID_LIST_REFRESH_INTERVAL = timedelta(hours=8)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -200,32 +200,30 @@ class ImmichImageAlbum(BaseImmichImage):
         self._attr_unique_id = album_id
         self._attr_name = f"Immich: {album_name}"
 
-    async def _refresh_available_asset_ids(self) -> list[str] | None:
-        """Refresh the list of available asset IDs."""
-        return [
-            image["id"] for image in await self.hub.list_album_images(self._album_id)
-        ]
-
 class ImmichImageSearch(BaseImmichImage):
-    """Image entity for Immich that displays a random image from a search query."""
+    """Image entity that shows a random image matching a search payload."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        hub: ImmichHub,
-        search_payload: dict,
-        unique_id: str,
-        name: str,
-    ) -> None:
-        """Initialize the Immich image entity."""
+    def __init__(self, hass, hub, search_payload, unique_id, name) -> None:
         super().__init__(hass, hub)
         self._search_payload = search_payload
         self._attr_unique_id = unique_id
         self._attr_name = name
 
     async def _refresh_available_asset_ids(self) -> list[str] | None:
-        """Refresh the list of available asset IDs."""
-        return [
-            image["id"]
-            for image in await self.hub.search_images(self._search_payload)
-        ]
+        """OR-search: query once per personId, then union the results."""
+        all_ids: set[str] = set()
+
+        base = {k: v for k, v in self._search_payload.items() if k != "personIds"}
+        person_ids = self._search_payload["personIds"]
+
+        async def _one(pid: str) -> list[dict]:
+            payload = {**base, "personIds": [pid]}
+            return await self.hub.search_images(payload)
+
+        results = await asyncio.gather(*[_one(pid) for pid in person_ids])
+
+        for assets in results:
+            all_ids.update(a["id"] for a in assets)
+
+        _LOGGER.debug("OR-search found %s unique assets", len(all_ids))
+        return list(all_ids)
