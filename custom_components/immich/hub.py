@@ -161,10 +161,13 @@ class ImmichHub:
             _LOGGER.error("Unexpected search response: %s", data)
             return []
 
-        return [
-            a for a in assets
-            if a.get("type") == "IMAGE" or a.get("assetType") == "IMAGE"
-        ]
+        allowed = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"}
+
+        def _mtype(asset: dict) -> str:
+            # Immich returns originalMimeType; older builds used mimeType
+            return asset.get("originalMimeType", asset.get("mimeType", "")).lower()
+
+        return [a for a in assets if a.get("type") == "IMAGE" and _mtype(a) in allowed]
 
     
     async def list_all_albums(self) -> list[dict]:
