@@ -51,6 +51,27 @@ async def async_setup_entry(
 
     config_entry.async_on_unload(config_entry.add_update_listener(update_listener))
 
+    # Hardcoded search for specific people as requested by the user
+    person_search_payload = {
+        "personIds": [
+            "a75f0e40-48b3-4f42-9139-662b5b0f8110",
+            "4b1f3c5b-6c69-455e-a5cb-e5e08ceb8a61",
+        ]
+    }
+    
+    # Create and add the new entity for the people search
+    async_add_entities(
+        [
+            ImmichImageSearch(
+                hass,
+                hub,
+                search_payload=person_search_payload,
+                unique_id="search_people_of_interest",
+                name="Immich: People of Interest",
+            )
+        ]
+    )
+
 
 async def update_listener(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Handle options updates."""
@@ -89,8 +110,9 @@ class BaseImmichImage(ImageEntity):
         return self._current_image_bytes
 
     async def _refresh_available_asset_ids(self) -> list[str] | None:
-        """Refresh the list of available asset IDs."""
-        raise NotImplementedError
+        """Return just the IDs Home Assistant needs."""
+        assets = await self.hub.search_images(self._search_payload)
+        return [a["id"] for a in assets]
 
     async def _get_next_asset_id(self) -> str | None:
         """Get the asset id of the next image we want to display."""
@@ -174,4 +196,28 @@ class ImmichImageAlbum(BaseImmichImage):
         """Refresh the list of available asset IDs."""
         return [
             image["id"] for image in await self.hub.list_album_images(self._album_id)
+        ]
+
+class ImmichImageSearch(BaseImmichImage):
+    """Image entity for Immich that displays a random image from a search query."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        hub: ImmichHub,
+        search_payload: dict,
+        unique_id: str,
+        name: str,
+    ) -> None:
+        """Initialize the Immich image entity."""
+        super().__init__(hass, hub)
+        self._search_payload = search_payload
+        self._attr_unique_id = unique_id
+        self._attr_name = name
+
+    async def _refresh_available_asset_ids(self) -> list[str] | None:
+        """Refresh the list of available asset IDs."""
+        return [
+            image["id"]
+            for image in await self.hub.search_images(self._search_payload)
         ]
