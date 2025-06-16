@@ -143,7 +143,7 @@ class ImmichHub:
 
         url = urljoin(self.host, "/api/search/metadata")
         headers = {"Accept": "application/json", _HEADER_API_KEY: self.api_key}
-        full_payload = {"type": "IMAGE", "size": 1000, **payload}
+        full_payload = {"type": "IMAGE", "size": 400, **payload}
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=full_payload) as resp:
