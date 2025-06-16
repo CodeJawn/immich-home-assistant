@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONF_WATCHED_ALBUMS
 from .hub import ImmichHub
 
-SCAN_INTERVAL = timedelta(minutes=5)
+SCAN_INTERVAL = timedelta(seconds=45)
 
 # How often to refresh the list of available asset IDs
 _ID_LIST_REFRESH_INTERVAL = timedelta(hours=12)
@@ -54,9 +54,17 @@ async def async_setup_entry(
     # Hardcoded search for specific people as requested by the user
     person_search_payload = {
         "personIds": [
+            "062a35df-b9e1-4157-af7f-a39b73eea08b",
             "a75f0e40-48b3-4f42-9139-662b5b0f8110",
             "4b1f3c5b-6c69-455e-a5cb-e5e08ceb8a61",
-        ]
+            "8c125b8d-b1c3-4363-8c68-e52c88a3b428",
+        ],
+
+        # show images taken on/after 1 Jan 2011 UTC
+        "takenAfter": "2011-01-01T00:00:00.000Z",
+
+        # images only
+        "type": "IMAGE",
     }
     
     # Create and add the new entity for the people search
