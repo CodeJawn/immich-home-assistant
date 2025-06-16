@@ -136,6 +136,37 @@ class ImmichHub:
             _LOGGER.error("Error connecting to the API: %s", exception)
             raise CannotConnect from exception
 
+
+    async def search_images(self, payload: dict) -> list[dict]:
+        """Return IMAGE-type assets matching an Immich search."""
+        _LOGGER.debug("search_images called with %s", payload)
+
+        url = urljoin(self.host, "/api/search/metadata")
+        headers = {"Accept": "application/json", _HEADER_API_KEY: self.api_key}
+        full_payload = {"type": "IMAGE", "size": 1000, **payload}
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=full_payload) as resp:
+                if resp.status != 200:
+                    _LOGGER.error("Immich search error: %s", await resp.text())
+                    raise ApiError()
+                data = await resp.json()
+
+        # ----- tolerant extractor: works with both old and future shapes -----
+        if "items" in data and isinstance(data["items"], list):         # future /assets endpoint
+            assets = data["items"]
+        elif "assets" in data and isinstance(data["assets"], dict):      # current /metadata endpoint
+            assets = data["assets"].get("items", [])
+        else:
+            _LOGGER.error("Unexpected search response: %s", data)
+            return []
+
+        return [
+            a for a in assets
+            if a.get("type") == "IMAGE" or a.get("assetType") == "IMAGE"
+        ]
+
+    
     async def list_all_albums(self) -> list[dict]:
         """List all albums."""
         try:
